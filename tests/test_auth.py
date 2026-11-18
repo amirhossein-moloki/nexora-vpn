@@ -75,8 +75,16 @@ class TestAuthAndSecurity(unittest.TestCase):
         self.assertTrue(acc.logged_in)
         self.assertTrue(acc.is_expired())
 
+    def test_login_requires_api_key_when_empty(self):
+        # Empty sb_key in config
+        self.cfg_mgr.set("sb_key", "")
+        with self.assertRaises(AuthError) as ctx:
+            self.auth_mgr.login("test@nexora.vpn", "pass")
+        self.assertIn("API Key", str(ctx.exception))
+
     @patch("urllib.request.urlopen")
     def test_login_successful_flow(self, mock_urlopen):
+        self.cfg_mgr.set("sb_key", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.anon.sample")
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps({
             "access_token": "jwt.sample.token",
@@ -91,6 +99,27 @@ class TestAuthAndSecurity(unittest.TestCase):
         self.assertEqual(acc.email, "test@nexora.vpn")
         self.assertEqual(acc.account_id, "user-uuid-1234")
         self.assertFalse(acc.is_expired())
+
+        # Verify apikey and authorization headers were passed
+        req_sent = mock_urlopen.call_args[0][0]
+        self.assertEqual(req_sent.get_header("Apikey"), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.anon.sample")
+        self.assertEqual(req_sent.get_header("Authorization"), "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.anon.sample")
+
+    @patch("urllib.request.urlopen")
+    def test_login_with_api_key_param(self, mock_urlopen):
+        self.cfg_mgr.set("sb_key", "")
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({
+            "access_token": "jwt.sample.token",
+            "refresh_token": "ref.sample.token",
+            "expires_in": 3600,
+            "user": {"id": "user-uuid-1234", "email": "test@nexora.vpn"}
+        }).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+        acc = self.auth_mgr.login("test@nexora.vpn", "strongpassword", api_key="param-key-123")
+        self.assertTrue(acc.logged_in)
+        self.assertEqual(self.cfg_mgr.get("sb_key"), "param-key-123")
 
 if __name__ == "__main__":
     unittest.main()

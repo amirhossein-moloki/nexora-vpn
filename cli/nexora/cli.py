@@ -60,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     login_p = subparsers.add_parser("login", parents=[common], help="Log in to your Nexora account")
     login_p.add_argument("--email", "-u", type=str, help="Account email address")
     login_p.add_argument("--password", "-p", type=str, help="Account password (prefer interactive prompt)")
+    login_p.add_argument("--api-key", "-k", type=str, help="Supabase Project API Key (anon/public key)")
 
     # logout command
     subparsers.add_parser("logout", parents=[common], help="Log out of the active account")
@@ -159,7 +160,7 @@ class CliApp:
                 return self.cmd_version(is_json)
 
             if cmd == "login":
-                return self.cmd_login(parsed.email, parsed.password, is_json)
+                return self.cmd_login(parsed.email, parsed.password, getattr(parsed, "api_key", None), is_json)
 
             if cmd == "logout":
                 return self.cmd_logout(is_json)
@@ -234,7 +235,13 @@ class CliApp:
             print(f"{__app_name__} version {__version__}")
         return EXIT_SUCCESS
 
-    def cmd_login(self, email: Optional[str], password: Optional[str], is_json: bool) -> int:
+    def cmd_login(self, email: Optional[str], password: Optional[str], api_key: Optional[str], is_json: bool) -> int:
+        existing_key = (self.config_mgr.get("sb_key") or "").strip()
+        if not api_key and not existing_key and not is_json:
+            prompt_key = prompt_password("Enter Supabase Project API Key / anon key (press Enter to skip): ").strip()
+            if prompt_key:
+                api_key = prompt_key
+
         if not email:
             if is_json:
                 raise InvalidInputError("Email is required in non-interactive / JSON mode (--email).")
@@ -251,7 +258,7 @@ class CliApp:
         if not password:
             raise InvalidInputError("Password cannot be empty.")
 
-        account = self.auth_mgr.login(email, password)
+        account = self.auth_mgr.login(email, password, api_key=api_key)
 
         if is_json:
             print_json(account.to_dict())

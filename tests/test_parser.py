@@ -46,10 +46,11 @@ class TestCliParser(unittest.TestCase):
         self.assertEqual(args.server, "france")
 
     def test_login_flags(self):
-        args = self.parser.parse_args(["login", "--email", "user@test.com", "--password", "secret123"])
+        args = self.parser.parse_args(["login", "--email", "user@test.com", "--password", "secret123", "--api-key", "key-xyz"])
         self.assertEqual(args.command, "login")
         self.assertEqual(args.email, "user@test.com")
         self.assertEqual(args.password, "secret123")
+        self.assertEqual(args.api_key, "key-xyz")
 
     def test_config_show_and_reset(self):
         args_show = self.parser.parse_args(["config", "show"])

@@ -50,6 +50,7 @@ class TestNetworkFailureHandling(unittest.TestCase):
 
     @patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Connection refused"))
     def test_auth_handles_network_error(self, mock_urlopen):
+        self.cfg_mgr.set("sb_key", "test_key")
         with self.assertRaises(AuthError):
             self.auth_mgr.login("user@test.com", "password123")
 

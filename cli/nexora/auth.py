@@ -21,24 +21,33 @@ class AuthManager:
         self.config_manager = config_manager
         self.cred_store = cred_store
 
-    def login(self, email: str, password: str) -> AccountInfo:
+    def login(self, email: str, password: str, api_key: Optional[str] = None) -> AccountInfo:
         """
         Authenticate with email and password.
         Uses Supabase Auth API with apikey.
         """
+        if api_key and api_key.strip():
+            self.config_manager.set("sb_key", api_key.strip())
+
         sb_url = self.config_manager.get("sb_url") or DEFAULT_SB_URL
-        sb_key = self.config_manager.get("sb_key") or ""
+        sb_key = (self.config_manager.get("sb_key") or "").strip()
+
+        if not sb_key:
+            raise AuthError(
+                "Supabase Project API Key (anon key) is required before authenticating. "
+                "Provide it via '--api-key <KEY>', configure it with 'nexora config set sb_key <KEY>', "
+                "or export NEXORA_API_KEY / SB_KEY."
+            )
 
         url = f"{sb_url.rstrip('/')}/auth/v1/token?grant_type=password"
         payload = json.dumps({"email": email, "password": password}).encode("utf-8")
         headers = {
             "content-type": "application/json",
-            "accept": "application/json"
+            "accept": "application/json",
+            "apikey": sb_key,
         }
-        if sb_key:
-            headers["apikey"] = sb_key
-            if sb_key.startswith("eyJ"):
-                headers["authorization"] = f"Bearer {sb_key}"
+        if sb_key.startswith("eyJ"):
+            headers["authorization"] = f"Bearer {sb_key}"
 
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
 

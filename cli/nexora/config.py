@@ -3,6 +3,7 @@ User configuration manager for Nexora VPN CLI.
 Stored at ~/.config/nexora/config.json.
 """
 
+import os
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -16,8 +17,8 @@ from .constants import (
 )
 
 DEFAULT_CONFIG: Dict[str, Any] = {
-    "sb_url": DEFAULT_SB_URL,
-    "sb_key": DEFAULT_SB_KEY,
+    "sb_url": os.environ.get("NEXORA_API_URL") or os.environ.get("SB_URL") or DEFAULT_SB_URL,
+    "sb_key": os.environ.get("NEXORA_API_KEY") or os.environ.get("SB_KEY") or DEFAULT_SB_KEY,
     "routing_mode": "bypass_lan_iran",
     "block_ads": True,
     "stealth_fragment": True,
@@ -62,7 +63,21 @@ class ConfigManager:
             json.dump(self._data, f, indent=2)
 
     def get(self, key: str, default: Any = None) -> Any:
-        return self._data.get(key, default if default is not None else DEFAULT_CONFIG.get(key))
+        val = self._data.get(key)
+        if val is not None and str(val).strip() != "":
+            return val
+
+        # Check environment variable fallbacks
+        if key == "sb_key":
+            env_key = os.environ.get("NEXORA_API_KEY") or os.environ.get("SB_KEY")
+            if env_key:
+                return env_key.strip()
+        elif key == "sb_url":
+            env_url = os.environ.get("NEXORA_API_URL") or os.environ.get("SB_URL")
+            if env_url:
+                return env_url.strip()
+
+        return default if default is not None else DEFAULT_CONFIG.get(key)
 
     def set(self, key: str, value: Any):
         self._data[key] = value
